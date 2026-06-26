@@ -162,14 +162,14 @@ wait_for_apt() {
     fi
   done
 
-  [ "$waited" -gt 0 ] && echo ""
+  if [ "$waited" -gt 0 ]; then echo ""; fi
 }
 
 wait_for_apt
 info "Обновляем индекс пакетов..."
-apt-get update -qq 2>&1 | grep -v "^$" | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done || true
+apt-get update 2>&1 | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done; true
 info "Устанавливаем: nginx ufw curl socat dnsutils..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y nginx ufw curl socat dnsutils 2>&1 | grep -E "(Setting up|already|error|Error)" | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y nginx ufw curl socat dnsutils 2>&1 | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done; true
 ok "Пакеты установлены"
 
 # ──────────────────────────────────────────────
