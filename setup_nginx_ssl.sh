@@ -1,6 +1,8 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+trap 'echo -e "\n\033[0;31m✘  Скрипт упал на строке ${LINENO}: [${BASH_COMMAND}] → код $?\033[0m\n"; exit 1' ERR
+
 # ──────────────────────────────────────────────
 #  Цвета и стили
 # ──────────────────────────────────────────────
@@ -108,9 +110,11 @@ wait_for_apt() {
 
   while true; do
     local busy=false
+    local busy_lock=""
     for lk in "${locks[@]}"; do
-      if fuser "$lk" &>/dev/null 2>&1; then
+      if [ -f "$lk" ] && lsof "$lk" &>/dev/null 2>&1; then
         busy=true
+        busy_lock="$lk"
         break
       fi
     done
@@ -119,8 +123,8 @@ wait_for_apt() {
     if [ "$waited" -eq 0 ]; then
       echo ""
       warn "apt заблокирован другим процессом..."
-      local APT_PID
-      APT_PID=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | tr -d ' ' || true)
+      local APT_PID=""
+      APT_PID=$(lsof -t "$busy_lock" 2>/dev/null | head -1 || true)
       if [ -n "${APT_PID:-}" ]; then
         local APT_CMD
         APT_CMD=$(ps -o cmd= -p "$APT_PID" 2>/dev/null || echo "?")
@@ -137,8 +141,8 @@ wait_for_apt() {
           if [ -n "${APT_PID:-}" ]; then
             warn "Убиваем PID ${APT_PID}..."
             kill -9 "$APT_PID" 2>/dev/null || true
-            sleep 1
-            dpkg --configure -a &>/dev/null || true
+            sleep 2
+            dpkg --configure -a 2>/dev/null || true
             ok "Процесс убит, dpkg восстановлен"
           else
             warn "PID не определён — ждём..."
@@ -163,9 +167,9 @@ wait_for_apt() {
 
 wait_for_apt
 info "Обновляем индекс пакетов..."
-apt-get update -qq
+apt-get update -qq 2>&1 | grep -v "^$" | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done || true
 info "Устанавливаем: nginx ufw curl socat dnsutils..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx ufw curl socat dnsutils
+DEBIAN_FRONTEND=noninteractive apt-get install -y nginx ufw curl socat dnsutils 2>&1 | grep -E "(Setting up|already|error|Error)" | while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done || true
 ok "Пакеты установлены"
 
 # ──────────────────────────────────────────────
