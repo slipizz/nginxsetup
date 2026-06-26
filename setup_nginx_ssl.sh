@@ -87,4 +87,22 @@ server {
 }
 EOF
 nginx -t && systemctl restart nginx
-echo "Готово."
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+echo
+echo -e "${GREEN}"
+echo "############################################################"
+echo "#                                                          #"
+echo "#                       ГОТОВО!                            #"
+echo "#                                                          #"
+echo "############################################################"
+echo -e "${NC}"
+
+echo "Домен: $DOMAIN"
+echo "HTTPS: https://$DOMAIN"
+echo
+echo "✔ SSL сертификат установлен"
+echo "✔ Nginx настроен"
+echo "✔ Firewall настроен"
+echo
