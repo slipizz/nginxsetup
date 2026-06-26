@@ -195,15 +195,25 @@ ok "DNS в порядке — домен указывает на сервер"
 # ──────────────────────────────────────────────
 step "Установка acme.sh и получение сертификата"
 
-if [ ! -f "$HOME/.acme.sh/acme.sh" ]; then
+ACME="$HOME/.acme.sh/acme.sh"
+
+if [ ! -f "$ACME" ]; then
   info "Устанавливаем acme.sh..."
-  curl -s https://get.acme.sh | sh -s -- --home "$HOME/.acme.sh"
+  # Запускаем инсталлер напрямую через bash чтобы избежать проблем с pipe+sh
+  curl -fsSL https://get.acme.sh -o /tmp/acme_install.sh
+  bash /tmp/acme_install.sh --install-online 2>&1 | while IFS= read -r line; do
+    echo -e "  ${DIM}${line}${NC}"
+  done
+  rm -f /tmp/acme_install.sh
+  # Подхватываем переменные окружения после установки
+  # shellcheck source=/dev/null
+  [ -f "$HOME/.acme.sh/acme.sh.env" ] && source "$HOME/.acme.sh/acme.sh.env" || true
+  [ -f "$ACME" ] || die "acme.sh не установился — проверьте интернет-соединение"
   ok "acme.sh установлен"
 else
-  ok "acme.sh уже есть: $HOME/.acme.sh/acme.sh"
+  ok "acme.sh уже есть: ${ACME}"
 fi
 
-ACME="$HOME/.acme.sh/acme.sh"
 "$ACME" --register-account -m "$EMAIL" 2>/dev/null || true
 
 mkdir -p /var/www/certbot /etc/nginx/ssl/"$DOMAIN"
@@ -228,10 +238,15 @@ nginx -t -q && systemctl restart nginx
 ok "Временный nginx запущен"
 
 info "Выпускаем сертификат для ${W}${DOMAIN}${NC}..."
-"$ACME" --issue -d "$DOMAIN" --webroot /var/www/certbot \
-  --force 2>&1 | while IFS= read -r line; do
-    echo -e "  ${DIM}${line}${NC}"
-  done
+# Запускаем в явном subshell, выход по ошибке отловим через временный файл
+ISSUE_RC=0
+"$ACME" --issue -d "$DOMAIN" --webroot /var/www/certbot --force 2>&1 | \
+  while IFS= read -r line; do echo -e "  ${DIM}${line}${NC}"; done
+ISSUE_RC="${PIPESTATUS[0]}"
+# acme.sh возвращает код 2 если сертификат уже актуален — это ок
+if [ "${ISSUE_RC}" -ne 0 ] && [ "${ISSUE_RC}" -ne 2 ]; then
+  die "acme.sh --issue завершился с кодом ${ISSUE_RC}"
+fi
 
 ok "Сертификат выпущен"
 
