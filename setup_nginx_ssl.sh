@@ -199,7 +199,7 @@ ACME="$HOME/.acme.sh/acme.sh"
 if [ ! -f "$ACME" ]; then
   info "Устанавливаем acme.sh..."
   curl -fsSL https://get.acme.sh -o /tmp/acme_install.sh
-  bash /tmp/acme_install.sh --install-online 2>&1 | while IFS= read -r line; do
+  bash /tmp/acme_install.sh 2>&1 | while IFS= read -r line; do
     echo -e "  ${DIM}${line}${NC}"
   done
   true
